@@ -1,0 +1,21 @@
+{
+  "name": "private-limit-order-agent",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@ethersproject/contracts": "^5.8.0",
+    "@ethersproject/providers": "^5.8.0",
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
+    "@skalenetwork/bite": "github:skalenetwork/bite-ts",
+    "dotenv": "^17.2.4",
+    "ethers": "^6.16.0",
+    "hardhat": "^2.28.5"
+  }
+}
