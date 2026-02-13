@@ -8,44 +8,57 @@ const orderBookAbi = [
   "event OrderPlaced(uint256 indexed orderId, address trader)",
 ];
 
+// ── Configurable order parameters ──
+const ORDER = {
+  limitPriceCents: 30,    // trigger when price <= $0.30
+  amountUSDC: 1_000_000,  // $1,000,000
+  slippagePercent: 1,
+};
+
 async function main() {
-  try {
-    const provider = new ethers.JsonRpcProvider(process.env.SKALE_RPC);
-    const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+  const provider = new ethers.JsonRpcProvider(process.env.SKALE_RPC);
+  const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
-    console.log("Wallet connected:", wallet.address);
+  console.log("=== Place Encrypted Limit Order ===");
+  console.log("Wallet:", wallet.address);
+  console.log("");
 
-    // Mock encrypted data (real BITE would generate this)
-    const mockEncrypted = ethers.toUtf8Bytes("mock_encrypted_order_data_" + Date.now());
+  // Build JSON payload (simulates what BITE v2 would encrypt)
+  const payload = JSON.stringify(ORDER);
+  const encryptedBytes = ethers.toUtf8Bytes(payload);
 
-    console.log("Mock encrypted data (bytes):", ethers.hexlify(mockEncrypted));
+  console.log("Order details:");
+  console.log(`  Limit Price : $${(ORDER.limitPriceCents / 100).toFixed(2)}`);
+  console.log(`  Amount      : $${ORDER.amountUSDC.toLocaleString()}`);
+  console.log(`  Slippage    : ${ORDER.slippagePercent}%`);
+  console.log(`  Payload     : ${payload}`);
+  console.log(`  Bytes (hex) : ${ethers.hexlify(encryptedBytes).slice(0, 40)}...`);
+  console.log("");
 
-    const orderBook = new ethers.Contract(ORDERBOOK_ADDRESS, orderBookAbi, wallet);
+  const orderBook = new ethers.Contract(ORDERBOOK_ADDRESS, orderBookAbi, wallet);
 
-    console.log("Submitting mock encrypted order...");
-    const tx = await orderBook.placeOrder(mockEncrypted);
-    console.log("Transaction sent:", tx.hash);
+  console.log("Submitting to OrderBook contract...");
+  const tx = await orderBook.placeOrder(encryptedBytes);
+  console.log("Tx sent:", tx.hash);
 
-    const receipt = await tx.wait();
-    console.log("Confirmed in block:", receipt.blockNumber);
+  const receipt = await tx.wait();
+  console.log("Confirmed in block:", receipt.blockNumber);
 
-    // Find OrderPlaced event
-    const orderPlacedEvent = receipt.logs.find(log => 
-      log.topics[0] === ethers.id("OrderPlaced(uint256,address)")
+  // Parse OrderPlaced event
+  const orderPlacedEvent = receipt.logs.find(
+    (log) => log.topics[0] === ethers.id("OrderPlaced(uint256,address)")
+  );
+
+  if (orderPlacedEvent) {
+    const [orderId] = ethers.AbiCoder.defaultAbiCoder().decode(
+      ["uint256"],
+      orderPlacedEvent.topics[1]
     );
-
-    if (orderPlacedEvent) {
-      const [orderId] = ethers.AbiCoder.defaultAbiCoder().decode(["uint256"], orderPlacedEvent.topics[1]);
-      console.log("Order ID:", orderId.toString());
-    } else {
-      console.log("No OrderPlaced event found — check explorer manually");
-    }
-
-    console.log("Full receipt:", receipt);
-  } catch (error) {
-    console.error("Error:");
-    console.error(error);
+    console.log(`\n✅ Order #${orderId} placed successfully!`);
+    console.log(`   Explorer: https://aware-fake-trim-testnet.explorer.testnet.skalenodes.com/tx/${receipt.hash}`);
+  } else {
+    console.log("\n✅ Order placed! Check explorer for details.");
   }
 }
 
-main();
+main().catch(console.error);

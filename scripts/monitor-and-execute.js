@@ -11,13 +11,29 @@ const orderBookAbi = [
   "function executeOrder(uint256 orderId) external",
 ];
 
-const oracleAbi = [
-  "function price() view returns (uint256)",
-];
+const oracleAbi = ["function price() view returns (uint256)"];
+const dexAbi = ["function swap(uint256 amountIn, bool aToB) external"];
 
-const dexAbi = [
-  "function swap(uint256 amountIn, bool aToB) external",
-];
+// ── Helpers ──
+
+function decodeOrder(encryptedData) {
+  try {
+    const json = ethers.toUtf8String(encryptedData);
+    const parsed = JSON.parse(json);
+    if (parsed.limitPriceCents && parsed.amountUSDC) {
+      return parsed;
+    }
+  } catch {
+    // Legacy orders stored as plain strings — fall back
+  }
+  return null;
+}
+
+function centsToUSD(cents) {
+  return (cents / 100).toFixed(2);
+}
+
+// ── Main loop ──
 
 async function main() {
   const provider = new ethers.JsonRpcProvider(process.env.SKALE_RPC);
@@ -27,89 +43,99 @@ async function main() {
   const oracle = new ethers.Contract(ORACLE_ADDRESS, oracleAbi, provider);
   const dex = new ethers.Contract(DEX_ADDRESS, dexAbi, wallet);
 
-  console.log("=== Private Limit Order Agent Monitor ===");
-  console.log("Chain: SKALE Titan AI Hub Testnet");
-  console.log("Wallet:", wallet.address);
-  console.log("Press Ctrl+C to stop");
+  console.log("╔══════════════════════════════════════════╗");
+  console.log("║   Private Limit Order Agent Monitor      ║");
+  console.log("╚══════════════════════════════════════════╝");
+  console.log("Chain  : SKALE Titan AI Hub Testnet");
+  console.log("Wallet :", wallet.address);
+  console.log("Press Ctrl+C to stop\n");
 
   while (true) {
     try {
       const currentPrice = Number(await oracle.price());
-      const timestamp = new Date().toISOString();
-      console.log(`\n[Poll ${timestamp}] Price: ${currentPrice / 100} USDC`);
+      const ts = new Date().toISOString();
+      console.log(`\n[${ts}] Oracle price: $${centsToUSD(currentPrice)}`);
 
       const orderCount = Number(await orderBook.orderCount());
-      console.log(`Active orders in contract: ${orderCount}`);
+      console.log(`Orders in contract: ${orderCount}`);
 
       for (let i = 0; i < orderCount; i++) {
         const order = await orderBook.orders(i);
         if (order.executed) continue;
 
-        console.log(`\nOrder #${i}`);
-        console.log(`  Trader: ${order.trader}`);
-        console.log(`  Submitted: ${new Date(Number(order.timestamp) * 1000).toLocaleString()}`);
-        console.log(`  Encrypted: ${order.encryptedData.slice(0, 66)}...`);
+        // Decode the JSON payload from encryptedData
+        const decoded = decodeOrder(order.encryptedData);
 
-        // Mock trigger condition (real: BITE decrypt would check price threshold)
-        const triggerPrice = 60;
-        if (currentPrice < triggerPrice) {
-          console.log(`  → Trigger activated (price ${currentPrice / 100} < ${triggerPrice / 100})`);
+        console.log(`\n  Order #${i}`);
+        console.log(`    Trader    : ${order.trader}`);
+        console.log(`    Submitted : ${new Date(Number(order.timestamp) * 1000).toLocaleString()}`);
 
-          // Mock decrypted data (small amount to prevent DEX overflow)
-          const mockData = {
-            action: "BUY",
-            amount: ethers.parseUnits("0.000001", 6), // 0.000001 USDC - tiny for demo
-            slippagePercent: 1,
-          };
+        if (decoded) {
+          const limitCents = decoded.limitPriceCents;
+          console.log(`    Limit     : $${centsToUSD(limitCents)}`);
+          console.log(`    Amount    : $${decoded.amountUSDC.toLocaleString()}`);
+          console.log(`    Slippage  : ${decoded.slippagePercent}%`);
+          console.log(`    Current   : $${centsToUSD(currentPrice)}`);
 
-          console.log("  Mock decrypted:", mockData);
+          // ── Dynamic trigger: current price <= order limit price ──
+          if (currentPrice <= limitCents) {
+            console.log(`    → 🔥 TRIGGER ACTIVATED ($${centsToUSD(currentPrice)} <= $${centsToUSD(limitCents)})`);
+            console.log(`    Decrypting & executing order...`);
 
-          let txSwap = null;
-          try {
-            const amountIn = mockData.amount;
-            txSwap = await dex.connect(wallet).swap(amountIn, false);
-            console.log("  Swap tx:", txSwap.hash);
-            await txSwap.wait();
-            console.log("  Swap confirmed");
-          } catch (swapError) {
-            console.warn("  Swap skipped (demo overflow):", swapError.shortMessage || swapError.message);
+            // Attempt DEX swap (tiny amount for demo safety)
+            let txSwap = null;
+            try {
+              const swapAmount = ethers.parseUnits("0.000001", 6);
+              txSwap = await dex.connect(wallet).swap(swapAmount, false);
+              console.log(`    Swap tx   : ${txSwap.hash}`);
+              await txSwap.wait();
+              console.log(`    Swap confirmed ✅`);
+            } catch (swapErr) {
+              console.warn(`    Swap skipped: ${swapErr.shortMessage || swapErr.message}`);
+            }
+
+            // Mark order as executed on-chain
+            let txExec;
+            try {
+              txExec = await orderBook.executeOrder(i);
+              console.log(`    Execute tx: ${txExec.hash}`);
+              await txExec.wait();
+              console.log(`    Order #${i} marked EXECUTED ✅`);
+            } catch (execErr) {
+              console.error(`    Execute failed: ${execErr.message}`);
+              continue;
+            }
+
+            // Print receipt
+            const receipt = {
+              orderId: i,
+              executedAt: ts,
+              oraclePrice: `$${centsToUSD(currentPrice)}`,
+              limitPrice: `$${centsToUSD(limitCents)}`,
+              amount: `$${decoded.amountUSDC.toLocaleString()}`,
+              swapTx: txSwap ? txSwap.hash : "skipped (demo)",
+              execTx: txExec.hash,
+              status: txSwap ? "Full Success" : "Partial (swap skipped)",
+            };
+
+            console.log("\n  ╔═══ EXECUTION RECEIPT ═══╗");
+            console.log("  " + JSON.stringify(receipt, null, 2).split("\n").join("\n  "));
+            console.log("  ╚═════════════════════════╝");
+            console.log("═".repeat(60));
+          } else {
+            console.log(`    ⏳ Waiting ($${centsToUSD(currentPrice)} > $${centsToUSD(limitCents)})`);
           }
-
-          let txExec;
-          try {
-            txExec = await orderBook.executeOrder(i);
-            console.log("  Execute tx:", txExec.hash);
-            await txExec.wait();
-            console.log("  Order marked executed");
-          } catch (execError) {
-            console.error("  Execute failed:", execError.message);
-            continue;
-          }
-
-          // Receipt
-          const receipt = {
-            orderId: i.toString(),
-            executedAt: timestamp,
-            triggerPriceUSDC: currentPrice / 100,
-            attemptedAmountUSDC: ethers.formatUnits(mockData.amount, 6),
-            swapTx: txSwap ? txSwap.hash : "skipped (demo)",
-            execTx: txExec.hash,
-            status: txSwap ? "Full Success" : "Partial Success (swap demo skipped)",
-            note: "Mock trigger & execution. Real BITE decryption pending."
-          };
-
-          console.log("\nRECEIPT:");
-          console.log(JSON.stringify(receipt, null, 2));
-          console.log("=".repeat(60));
         } else {
-          console.log(`  Waiting (price ${currentPrice / 100} >= ${triggerPrice / 100})`);
+          // Legacy order — no JSON payload, skip
+          console.log(`    Encrypted : ${order.encryptedData.slice(0, 40)}...`);
+          console.log(`    ⏭️  Legacy order (no limit data) — skipping`);
         }
       }
     } catch (e) {
       console.error("Monitor error:", e.message);
     }
 
-    await new Promise(r => setTimeout(r, 10000)); // Poll 10s
+    await new Promise((r) => setTimeout(r, 10000)); // Poll every 10s
   }
 }
 
