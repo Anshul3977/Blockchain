@@ -16,17 +16,20 @@ const dexAbi = ["function swap(uint256 amountIn, bool aToB) external"];
 
 // ── Helpers ──
 
-function decodeOrder(encryptedData) {
+function decodeOrder(encryptedDataHex) {
+  // NOTE: BITE decryption requires the placement tx hash via
+  // bite.getDecryptedTransactionData(txHash). Since orders don't store
+  // their tx hash, we decode inline. When BITE is fully integrated,
+  // store tx hashes alongside orders and use getDecryptedTransactionData.
   try {
-    const json = ethers.toUtf8String(encryptedData);
+    const json = ethers.toUtf8String(encryptedDataHex);
     const parsed = JSON.parse(json);
-    if (parsed.limitPriceCents && parsed.amountUSDC) {
-      return parsed;
-    }
-  } catch {
-    // Legacy orders stored as plain strings — fall back
+    console.log(`    ✅ Decoded order data`);
+    return parsed;
+  } catch (e) {
+    console.log(`    ❌ Decode failed: ${e.message}`);
+    return null;
   }
-  return null;
 }
 
 function centsToUSD(cents) {
@@ -54,83 +57,80 @@ async function main() {
     try {
       const currentPrice = Number(await oracle.price());
       const ts = new Date().toISOString();
-      console.log(`\n[${ts}] Oracle price: $${centsToUSD(currentPrice)}`);
+      console.log(`\n[${ts}] Oracle price: $${centsToUSD(currentPrice)} (${currentPrice} cents)`);
 
       const orderCount = Number(await orderBook.orderCount());
       console.log(`Orders in contract: ${orderCount}`);
 
       for (let i = 0; i < orderCount; i++) {
+        console.log(`\n  --- Processing Order #${i} ---`);
         const order = await orderBook.orders(i);
-        if (order.executed) continue;
 
-        // Decode the JSON payload from encryptedData
+        // 1. Show raw encrypted bytes
+        console.log(`  Raw Bytes: ${order.encryptedData.slice(0, 40)}...`);
+        console.log(`  Executed : ${order.executed}`);
+
+        if (order.executed) {
+          console.log(`  Skipping (Already Executed)`);
+          continue;
+        }
+
+        // 2. Decode order data
         const decoded = decodeOrder(order.encryptedData);
 
-        console.log(`\n  Order #${i}`);
-        console.log(`    Trader    : ${order.trader}`);
-        console.log(`    Submitted : ${new Date(Number(order.timestamp) * 1000).toLocaleString()}`);
+        if (!decoded) {
+          console.log(`  Skipping: Could not decode order data`);
+          continue;
+        }
 
-        if (decoded) {
-          const limitCents = decoded.limitPriceCents;
-          console.log(`    Limit     : $${centsToUSD(limitCents)}`);
-          console.log(`    Amount    : $${decoded.amountUSDC.toLocaleString()}`);
-          console.log(`    Slippage  : ${decoded.slippagePercent}%`);
-          console.log(`    Current   : $${centsToUSD(currentPrice)}`);
+        console.log(`  Payload  :`, JSON.stringify(decoded));
 
-          // ── Dynamic trigger: current price <= order limit price ──
-          if (currentPrice <= limitCents) {
-            console.log(`    → 🔥 TRIGGER ACTIVATED ($${centsToUSD(currentPrice)} <= $${centsToUSD(limitCents)})`);
-            console.log(`    Decrypting & executing order...`);
+        // Support both frontend format (limitPrice in dollars) and script format (limitPriceCents)
+        const limitCents = decoded.limitPriceCents ?? Math.round((decoded.limitPrice ?? 0) * 100);
 
-            // Attempt DEX swap (tiny amount for demo safety)
-            let txSwap = null;
-            try {
-              const swapAmount = ethers.parseUnits("0.000001", 6);
-              txSwap = await dex.connect(wallet).swap(swapAmount, false);
-              console.log(`    Swap tx   : ${txSwap.hash}`);
-              await txSwap.wait();
-              console.log(`    Swap confirmed ✅`);
-            } catch (swapErr) {
-              console.warn(`    Swap skipped: ${swapErr.shortMessage || swapErr.message}`);
-            }
+        if (!limitCents) {
+          console.log(`  Skipping: Missing limit price in payload`);
+          continue;
+        }
 
-            // Mark order as executed on-chain
-            let txExec;
-            try {
-              txExec = await orderBook.executeOrder(i);
-              console.log(`    Execute tx: ${txExec.hash}`);
-              await txExec.wait();
-              console.log(`    Order #${i} marked EXECUTED ✅`);
-            } catch (execErr) {
-              console.error(`    Execute failed: ${execErr.message}`);
-              continue;
-            }
+        // 3. Trigger Logic
+        const currentPriceCents = currentPrice;
 
-            // Print receipt
-            const receipt = {
-              orderId: i,
-              executedAt: ts,
-              oraclePrice: `$${centsToUSD(currentPrice)}`,
-              limitPrice: `$${centsToUSD(limitCents)}`,
-              amount: `$${decoded.amountUSDC.toLocaleString()}`,
-              swapTx: txSwap ? txSwap.hash : "skipped (demo)",
-              execTx: txExec.hash,
-              status: txSwap ? "Full Success" : "Partial (swap skipped)",
-            };
+        console.log(`  Current Price : $${centsToUSD(currentPriceCents)} (${currentPriceCents})`);
+        console.log(`  Limit Price   : $${centsToUSD(limitCents)} (${limitCents})`);
 
-            console.log("\n  ╔═══ EXECUTION RECEIPT ═══╗");
-            console.log("  " + JSON.stringify(receipt, null, 2).split("\n").join("\n  "));
-            console.log("  ╚═════════════════════════╝");
-            console.log("═".repeat(60));
-          } else {
-            console.log(`    ⏳ Waiting ($${centsToUSD(currentPrice)} > $${centsToUSD(limitCents)})`);
+        const shouldExecute = currentPriceCents <= limitCents;
+        console.log(`  Comparison    : ${currentPriceCents} <= ${limitCents} = ${shouldExecute}`);
+
+        if (shouldExecute) {
+          console.log(`  >>> EXECUTING ORDER #${i} <<<`);
+
+          // Attempt DEX swap (tiny amount for demo safety)
+          try {
+            const swapAmount = ethers.parseUnits("0.000001", 6);
+            console.log(`    Swapping...`);
+            const txSwap = await dex.swap(swapAmount, false);
+            await txSwap.wait();
+            console.log(`    Swap Confirmed: ${txSwap.hash}`);
+          } catch (swapErr) {
+            console.log(`    Swap Skipped: ${swapErr.message}`);
+          }
+
+          // Execute on OrderBook
+          try {
+            console.log(`    Calling executeOrder(${i})...`);
+            const txExec = await orderBook.executeOrder(i);
+            console.log(`    Tx Sent: ${txExec.hash}`);
+            const receipt = await txExec.wait();
+            console.log(`    ✅ Order #${i} EXECUTED in block ${receipt.blockNumber}`);
+          } catch (execErr) {
+            console.error(`    ❌ Execution Failed: ${execErr.message}`);
           }
         } else {
-          // Legacy order — no JSON payload, skip
-          console.log(`    Encrypted : ${order.encryptedData.slice(0, 40)}...`);
-          console.log(`    ⏭️  Legacy order (no limit data) — skipping`);
+          console.log(`  Status        : Waiting...`);
         }
       }
+
     } catch (e) {
       console.error("Monitor error:", e.message);
     }

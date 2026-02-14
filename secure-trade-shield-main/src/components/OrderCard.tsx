@@ -89,18 +89,24 @@ const OrderCard = ({ order, onCancel, onViewReceipt }: OrderCardProps) => {
           </Button>
         )}
 
-        {/* Show View Receipt for any order with a txHash */}
-        {order.txHash && (
-          <>
-            <Button variant="outline" size="sm" onClick={() => onViewReceipt(order)}>
-              View Receipt
-            </Button>
-            <Button variant="ghost" size="sm" className="text-accent" asChild>
-              <a href={explorerTxUrl!} target="_blank" rel="noreferrer">
-                View Tx <ExternalLink className="ml-1 h-3 w-3" />
-              </a>
-            </Button>
-          </>
+        {/* Show View Receipt for executed orders or any order with txHash */}
+        {(order.status === "executed" || order.txHash) && (
+          <Button variant="outline" size="sm" onClick={() => onViewReceipt(order)}>
+            View Receipt
+          </Button>
+        )}
+
+        {/* Show View Tx for executed orders or when txHash exists */}
+        {(order.status === "executed" || explorerTxUrl) && (
+          <Button variant="ghost" size="sm" className="text-accent" asChild>
+            <a
+              href={explorerTxUrl || `${SKALE_EXPLORER}/address/${import.meta.env.VITE_ORDERBOOK_ADDRESS}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              View Tx <ExternalLink className="ml-1 h-3 w-3" />
+            </a>
+          </Button>
         )}
       </div>
     </div>

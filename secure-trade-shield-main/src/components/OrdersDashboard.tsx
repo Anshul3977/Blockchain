@@ -15,6 +15,9 @@ interface OrdersDashboardProps {
   onCancel: (id: number) => void;
 }
 
+/** Read-only fallback provider (no wallet required) */
+const FALLBACK_RPC = import.meta.env.VITE_SKALE_RPC as string;
+
 const OrdersDashboard = ({ localOrders, onCancel }: OrdersDashboardProps) => {
   const { provider, isConnected } = useWallet();
   const [chainOrders, setChainOrders] = useState<Order[]>([]);
@@ -24,23 +27,40 @@ const OrdersDashboard = ({ localOrders, onCancel }: OrdersDashboardProps) => {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchOrders = useCallback(async () => {
-    if (!provider) return;
+    // Use wallet provider if available, otherwise fall back to public RPC
+    const activeProvider =
+      provider || new ethers.JsonRpcProvider(FALLBACK_RPC);
+
+    console.log("[OrdersDashboard] fetchOrders() starting", {
+      usingWalletProvider: !!provider,
+      rpcUrl: provider ? "MetaMask/BrowserProvider" : FALLBACK_RPC,
+      contractAddress: CONTRACTS.orderBook,
+    });
+
+    if (!activeProvider) {
+      console.warn("[OrdersDashboard] No provider available (wallet or RPC). Skipping fetch.");
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
     try {
-      const contract = new ethers.Contract(CONTRACTS.orderBook, ORDERBOOK_ABI, provider);
+      const contract = new ethers.Contract(CONTRACTS.orderBook, ORDERBOOK_ABI, activeProvider);
+      console.log("[OrdersDashboard] Contract instance created");
+
       const count: bigint = await contract.orderCount();
       const total = Number(count);
+      console.log("[OrdersDashboard] orderCount() =", total, "(raw:", count.toString(), ")");
 
       // Fetch OrderPlaced events to get txHash for each order
       const eventFilter = contract.filters.OrderPlaced();
       let events: ethers.Log[] = [];
       try {
         events = await contract.queryFilter(eventFilter);
-      } catch {
-        // If event query fails, continue without txHash
+        console.log("[OrdersDashboard] OrderPlaced events fetched:", events.length);
+      } catch (eventErr) {
+        console.warn("[OrdersDashboard] Event query failed (continuing without txHash):", eventErr);
       }
 
       // Map orderId → txHash from events
@@ -54,55 +74,87 @@ const OrdersDashboard = ({ localOrders, onCancel }: OrdersDashboardProps) => {
           if (parsed && parsed.name === "OrderPlaced") {
             txHashMap.set(Number(parsed.args.orderId), event.transactionHash);
           }
-        } catch {
-          // Skip unparseable logs
+        } catch (parseErr) {
+          console.warn("[OrdersDashboard] Failed to parse event log:", parseErr);
         }
       }
 
       const fetched: Order[] = [];
       for (let i = 0; i < total; i++) {
-        const raw = await contract.orders(i);
-        fetched.push({
-          id: i,
-          amount: 0, // encrypted — not readable on-chain
-          limitPrice: 0,
-          slippage: 0,
-          status: raw.executed ? "executed" : "waiting",
-          submittedAt: new Date(Number(raw.timestamp) * 1000).toISOString(),
-          txHash: txHashMap.get(i),
-        });
+        try {
+          const raw = await contract.orders(i);
+          console.log(`[OrdersDashboard] Order #${i} raw:`, {
+            encryptedData: raw.encryptedData,
+            trader: raw.trader,
+            timestamp: raw.timestamp?.toString(),
+            executed: raw.executed,
+          });
+
+          // Decode encrypted data for display
+          let limitPrice = 0;
+          let amount = 0;
+          let slippage = 0;
+          try {
+            const json = ethers.toUtf8String(raw.encryptedData);
+            const parsed = JSON.parse(json);
+            console.log(`[OrdersDashboard] Order #${i} decoded:`, parsed);
+            if (parsed.limitPriceCents) limitPrice = parsed.limitPriceCents / 100;
+            if (parsed.amountUSDC) amount = parsed.amountUSDC;
+            if (parsed.slippagePercent) slippage = parsed.slippagePercent;
+          } catch (decodeErr) {
+            console.warn(`[OrdersDashboard] Order #${i} decode failed (legacy/malformed):`, decodeErr);
+          }
+
+          fetched.push({
+            id: i,
+            amount,
+            limitPrice,
+            slippage,
+            status: raw.executed ? "executed" : "waiting",
+            submittedAt: new Date(Number(raw.timestamp) * 1000).toISOString(),
+            txHash: txHashMap.get(i),
+          });
+        } catch (orderErr) {
+          console.error(`[OrdersDashboard] Failed to fetch order #${i}:`, orderErr);
+        }
       }
 
+      console.log("[OrdersDashboard] Total orders fetched:", fetched.length);
       setChainOrders(fetched);
     } catch (err) {
-      console.error("Failed to fetch orders:", err);
+      console.error("[OrdersDashboard] fetchOrders FAILED:", err);
       setError("Failed to load orders from contract.");
     } finally {
       setLoading(false);
     }
   }, [provider]);
 
-  // Fetch on mount + poll every 30s
+  // Fetch on mount + poll every 5s
+  // Orders are public on-chain data, so we fetch even without a wallet connection
   useEffect(() => {
-    if (!isConnected || !provider) {
-      setChainOrders([]);
-      return;
-    }
-
     fetchOrders();
-    intervalRef.current = setInterval(fetchOrders, 30_000);
+    intervalRef.current = setInterval(fetchOrders, 5_000);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isConnected, provider, fetchOrders]);
+  }, [fetchOrders]);
 
-  // Merge: local session orders first, then on-chain orders (de-duped by id)
-  const localIds = new Set(localOrders.map((o) => o.id));
+  // Merge: chain data is source of truth for status. Local orders only shown
+  // if they haven't appeared on-chain yet (e.g. just submitted, not indexed).
+  const chainIds = new Set(chainOrders.map((o) => o.id));
   const mergedOrders = [
-    ...localOrders,
-    ...chainOrders.filter((o) => !localIds.has(o.id)),
+    ...chainOrders,
+    ...localOrders.filter((o) => !chainIds.has(o.id)),
   ];
+
+  console.log("[OrdersDashboard] render", {
+    localOrders: localOrders.length,
+    chainOrders: chainOrders.length,
+    mergedOrders: mergedOrders.length,
+    isConnected,
+    hasProvider: !!provider,
+  });
 
   return (
     <div className="mx-auto w-full max-w-[600px] px-4 py-8">

@@ -6,6 +6,9 @@ import OrdersDashboard from "@/components/OrdersDashboard";
 import StatsDashboard from "@/components/StatsDashboard";
 import MEVComparison from "@/components/MEVComparison";
 import TechArchitecture from "@/components/TechArchitecture";
+import EncryptedLifecycle from "@/components/EncryptedLifecycle";
+import WhyPrivacyMatters from "@/components/WhyPrivacyMatters";
+import SafetyGuardrails from "@/components/SafetyGuardrails";
 import JudgeMode from "@/components/JudgeMode";
 import { useWallet } from "@/hooks/useWallet";
 import type { Order } from "@/lib/mockData";
@@ -97,8 +100,11 @@ const Index = () => {
             onCloseReceipt={() => setReceiptOrder(null)}
           />
           <OrdersDashboard localOrders={orders} onCancel={handleCancel} />
+          <EncryptedLifecycle />
           <StatsDashboard />
+          <WhyPrivacyMatters />
           <MEVComparison />
+          <SafetyGuardrails />
           <TechArchitecture />
         </main>
       )}

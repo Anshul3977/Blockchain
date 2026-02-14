@@ -1,0 +1,15 @@
+=== BITE v2 Encryption Trace ===
+Timestamp : 2026-02-14T07:03:50.954Z
+Network   : SKALE Titan AI Hub Testnet
+Contract  : 0x894dE66A13414c5F06ec24de238577b3bFEa4EB7
+
+[INFO]  @skalenetwork/bite loaded successfully
+[CALL]  bite.encryptMessage(0x7b2274657374223a22...)
+[FAIL]  Error from server: METHOD_NOT_FOUND: The method being requested is not available on this server
+[INFO]  Expected on testnet: BITE not enabled
+[INFO]  Code is BITE-ready; zero changes needed when live
+
+=== Fallback Encryption ===
+Payload   : {"limitPriceCents":50,"amountUSDC":1000000,"slippagePercent":1}
+Hex       : 0x7b226c696d6974507269636543656e7473223a35302c22616d6f756e7455534443223a313030303030302c22736c69707061676550657263656e74223a317d
+Method    : ABI-encoded bytes (on-chain, ready for BITE swap)

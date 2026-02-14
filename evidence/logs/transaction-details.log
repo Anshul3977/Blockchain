@@ -1,0 +1,3 @@
+=== Transaction Details ===
+
+Event query error: could not coalesce error (error={ "code": -32602, "data": null, "message": "INVALID_PARAMS: Invalid method parameters (invalid name and/or type) recognised: Log response size exceeded. Maximum allowed number of requested blocks is 2000" }, payload={ "id": 45, "jsonrpc": "2.0", "method": "eth_getLogs", "params": [ { "address": "0x894de66a13414c5f06ec24de238577b3bfea4eb7", "fromBlock": "0x5c7460", "toBlock": "0x5d37b0", "topics": [ "0x5222ba5f86a58ad15e7771bd95a809f162ae1762ea7cd66e28a58217341334cc" ] } ] }, code=UNKNOWN_ERROR, version=6.16.0)

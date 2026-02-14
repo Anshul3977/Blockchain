@@ -81,20 +81,12 @@ const Header = ({
 
     const fetchBalance = async () => {
       try {
-        const contract = new ethers.Contract(CONTRACTS.usdc, USDC_ABI, provider);
-        const raw: bigint = await contract.balanceOf(address);
-        // MockUSDC has 6 decimals like real USDC
-        const formatted = ethers.formatUnits(raw, 6);
-        setUsdcBalance(parseFloat(formatted).toLocaleString("en-US", { maximumFractionDigits: 2 }));
+        const sFuelBal = await provider.getBalance(address);
+        const formatted = parseFloat(ethers.formatEther(sFuelBal)).toFixed(4);
+        setUsdcBalance(`${formatted} sFUEL`);
       } catch (err) {
-        console.error("Failed to fetch USDC balance, falling back to sFUEL:", err);
-        try {
-          const sFuelBal = await provider.getBalance(address);
-          const formatted = parseFloat(ethers.formatEther(sFuelBal)).toFixed(4);
-          setUsdcBalance(`${formatted} sFUEL`);
-        } catch {
-          setUsdcBalance(null);
-        }
+        console.error("Failed to fetch sFUEL balance:", err);
+        setUsdcBalance(null);
       }
     };
 
@@ -138,7 +130,7 @@ const Header = ({
             <div className="hidden items-center gap-1.5 sm:flex">
               <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="font-mono text-xs text-foreground">
-                {usdcBalance.includes("sFUEL") ? usdcBalance : `${usdcBalance} USDC`}
+                {usdcBalance}
               </span>
             </div>
           )}

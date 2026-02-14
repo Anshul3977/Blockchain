@@ -1,0 +1,182 @@
+=== Private Limit Order Agent — Monitor Log ===
+Started  : 2026-02-14T07:03:52.680Z
+Interval : 10 seconds
+Wallet   : 0x0cEd70C641b989659eB3BF4b8955F232ccE87E87
+
+[POLL] Oracle price: $0.45 (45 cents)
+[INFO] Orders in contract: 19
+
+--- Order #0 ---
+  Trader   : 0x0cEd70C641b989659eB3BF4b8955F232ccE87E87
+  Executed : true
+  Raw Data : 0x6d6f636b5f656e637279707465645f6f726465725f646174615f313737...
+  Decode   : Failed (may be BITE-encrypted)
+
+--- Order #1 ---
+  Trader   : 0x0cEd70C641b989659eB3BF4b8955F232ccE87E87
+  Executed : true
+  Raw Data : 0x6d6f636b5f656e637279707465645f6f726465725f646174615f313737...
+  Decode   : Failed (may be BITE-encrypted)
+
+--- Order #2 ---
+  Trader   : 0x0cEd70C641b989659eB3BF4b8955F232ccE87E87
+  Executed : true
+  Raw Data : 0x6d6f636b5f656e637279707465645f6f726465725f646174615f313737...
+  Decode   : Failed (may be BITE-encrypted)
+
+--- Order #3 ---
+  Trader   : 0x0cEd70C641b989659eB3BF4b8955F232ccE87E87
+  Executed : true
+  Raw Data : 0x6d6f636b5f656e637279707465645f6f726465725f646174615f313737...
+  Decode   : Failed (may be BITE-encrypted)
+
+--- Order #4 ---
+  Trader   : 0x0cEd70C641b989659eB3BF4b8955F232ccE87E87
+  Executed : true
+  Raw Data : 0x7b22616d6f756e74223a313030303030302c226c696d69745072696365...
+  Decoded  : {"amount":1000000,"limitPrice":0.5,"slippage":1,"timestamp":1770801590082}
+  Limit    : $0.50
+  Amount   : $1,000,000
+  Status   : ✅ EXECUTED
+  Check    : 45 ≤ 50 = true → Executed
+
+--- Order #5 ---
+  Trader   : 0x0cEd70C641b989659eB3BF4b8955F232ccE87E87
+  Executed : true
+  Raw Data : 0x7b22616d6f756e74223a313030303030302c226c696d69745072696365...
+  Decoded  : {"amount":1000000,"limitPrice":0.5,"slippage":1,"timestamp":1770996718195}
+  Limit    : $0.50
+  Amount   : $1,000,000
+  Status   : ✅ EXECUTED
+  Check    : 45 ≤ 50 = true → Executed
+
+--- Order #6 ---
+  Trader   : 0x0cEd70C641b989659eB3BF4b8955F232ccE87E87
+  Executed : true
+  Raw Data : 0x7b22616d6f756e74223a313030303030302c226c696d69745072696365...
+  Decoded  : {"amount":1000000,"limitPrice":0.3,"slippage":1,"timestamp":1771004359062}
+  Limit    : $0.30
+  Amount   : $1,000,000
+  Status   : ✅ EXECUTED
+  Check    : 45 ≤ 30 = true → Executed
+
+--- Order #7 ---
+  Trader   : 0x0cEd70C641b989659eB3BF4b8955F232ccE87E87
+  Executed : true
+  Raw Data : 0x7b226c696d6974507269636543656e7473223a33302c22616d6f756e74...
+  Decoded  : {"limitPriceCents":30,"amountUSDC":1000000,"slippagePercent":1}
+  Limit    : $0.30
+  Amount   : $1,000,000
+  Status   : ✅ EXECUTED
+  Check    : 45 ≤ 30 = true → Executed
+
+--- Order #8 ---
+  Trader   : 0x0cEd70C641b989659eB3BF4b8955F232ccE87E87
+  Executed : true
+  Raw Data : 0x7b226c696d6974507269636543656e7473223a35302c22616d6f756e74...
+  Decoded  : {"limitPriceCents":50,"amountUSDC":1000000,"slippagePercent":1}
+  Limit    : $0.50
+  Amount   : $1,000,000
+  Status   : ✅ EXECUTED
+  Check    : 45 ≤ 50 = true → Executed
+
+--- Order #9 ---
+  Trader   : 0x0cEd70C641b989659eB3BF4b8955F232ccE87E87
+  Executed : true
+  Raw Data : 0x7b226c696d6974507269636543656e7473223a35302c22616d6f756e74...
+  Decoded  : {"limitPriceCents":50,"amountUSDC":1000000,"slippagePercent":1}
+  Limit    : $0.50
+  Amount   : $1,000,000
+  Status   : ✅ EXECUTED
+  Check    : 45 ≤ 50 = true → Executed
+
+--- Order #10 ---
+  Trader   : 0x0cEd70C641b989659eB3BF4b8955F232ccE87E87
+  Executed : true
+  Raw Data : 0x7b226c696d6974507269636543656e7473223a35302c22616d6f756e74...
+  Decoded  : {"limitPriceCents":50,"amountUSDC":1000000,"slippagePercent":1}
+  Limit    : $0.50
+  Amount   : $1,000,000
+  Status   : ✅ EXECUTED
+  Check    : 45 ≤ 50 = true → Executed
+
+--- Order #11 ---
+  Trader   : 0x0cEd70C641b989659eB3BF4b8955F232ccE87E87
+  Executed : true
+  Raw Data : 0x7b22616d6f756e74223a3130303030302c226c696d6974507269636522...
+  Decoded  : {"amount":100000,"limitPrice":0.5,"slippage":1,"timestamp":1771011818744}
+  Limit    : $0.50
+  Amount   : $100,000
+  Status   : ✅ EXECUTED
+  Check    : 45 ≤ 50 = true → Executed
+
+--- Order #12 ---
+  Trader   : 0x0cEd70C641b989659eB3BF4b8955F232ccE87E87
+  Executed : true
+  Raw Data : 0x7b226c696d6974507269636543656e7473223a35302c22616d6f756e74...
+  Decoded  : {"limitPriceCents":50,"amountUSDC":1000000,"slippagePercent":1}
+  Limit    : $0.50
+  Amount   : $1,000,000
+  Status   : ✅ EXECUTED
+  Check    : 45 ≤ 50 = true → Executed
+
+--- Order #13 ---
+  Trader   : 0x0cEd70C641b989659eB3BF4b8955F232ccE87E87
+  Executed : true
+  Raw Data : 0x7b226c696d6974507269636543656e7473223a35302c22616d6f756e74...
+  Decoded  : {"limitPriceCents":50,"amountUSDC":1000000,"slippagePercent":1}
+  Limit    : $0.50
+  Amount   : $1,000,000
+  Status   : ✅ EXECUTED
+  Check    : 45 ≤ 50 = true → Executed
+
+--- Order #14 ---
+  Trader   : 0x0cEd70C641b989659eB3BF4b8955F232ccE87E87
+  Executed : true
+  Raw Data : 0x7b22616d6f756e74223a313030303030302c226c696d69745072696365...
+  Decoded  : {"amount":1000000,"limitPrice":0.5,"slippage":1,"timestamp":1771047577435}
+  Limit    : $0.50
+  Amount   : $1,000,000
+  Status   : ✅ EXECUTED
+  Check    : 45 ≤ 50 = true → Executed
+
+--- Order #15 ---
+  Trader   : 0x0cEd70C641b989659eB3BF4b8955F232ccE87E87
+  Executed : true
+  Raw Data : 0x7b22616d6f756e74223a313030303030302c226c696d69745072696365...
+  Decoded  : {"amount":1000000,"limitPrice":0.5,"slippage":1,"timestamp":1771048488902}
+  Limit    : $0.50
+  Amount   : $1,000,000
+  Status   : ✅ EXECUTED
+  Check    : 45 ≤ 50 = true → Executed
+
+--- Order #16 ---
+  Trader   : 0x0cEd70C641b989659eB3BF4b8955F232ccE87E87
+  Executed : true
+  Raw Data : 0x7b22616d6f756e74223a3130303030302c226c696d6974507269636522...
+  Decoded  : {"amount":100000,"limitPrice":0.5,"slippage":1,"timestamp":1771048969991}
+  Limit    : $0.50
+  Amount   : $100,000
+  Status   : ✅ EXECUTED
+  Check    : 45 ≤ 50 = true → Executed
+
+--- Order #17 ---
+  Trader   : 0x0cEd70C641b989659eB3BF4b8955F232ccE87E87
+  Executed : true
+  Raw Data : 0x7b22616d6f756e74223a313030303030302c226c696d69745072696365...
+  Decoded  : {"amount":1000000,"limitPrice":0.5,"slippage":1,"timestamp":1771050524934}
+  Limit    : $0.50
+  Amount   : $1,000,000
+  Status   : ✅ EXECUTED
+  Check    : 45 ≤ 50 = true → Executed
+
+--- Order #18 ---
+  Trader   : 0x0cEd70C641b989659eB3BF4b8955F232ccE87E87
+  Executed : true
+  Raw Data : 0x7b22616d6f756e74223a313030303030302c226c696d69745072696365...
+  Decoded  : {"amount":1000000,"limitPrice":0.5,"slippage":1,"timestamp":1771051149149}
+  Limit    : $0.50
+  Amount   : $1,000,000
+  Status   : ✅ EXECUTED
+  Check    : 45 ≤ 50 = true → Executed
+

@@ -1,0 +1,21 @@
+{
+  "project": "Private Limit Order Agent",
+  "track": "Encrypted Agents (BITE v2)",
+  "network": "SKALE Titan AI Hub Testnet",
+  "chainId": "0x561bf78b",
+  "generatedAt": "2026-02-14T07:04:02.831Z",
+  "contracts": {
+    "orderBook": "0x894dE66A13414c5F06ec24de238577b3bFEa4EB7",
+    "oracle": "0x503a2A1739B1cEB4067916bA9e26E25494BF9f43"
+  },
+  "explorer": "https://aware-fake-trim-testnet.explorer.testnet.skalenodes.com",
+  "stats": {
+    "totalOrders": 19,
+    "currentOraclePrice": "$0.45",
+    "biteAvailable": true
+  },
+  "transactions": {
+    "latestPlacement": "none found",
+    "latestExecution": "none found"
+  }
+}

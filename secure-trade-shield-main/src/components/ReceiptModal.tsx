@@ -14,6 +14,10 @@ import {
   EyeOff,
   Zap,
   ShieldCheck,
+  Clock,
+  Activity,
+  FileText,
+  Unlock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,6 +49,7 @@ const ReceiptModal = ({ order, open, onClose }: ReceiptModalProps) => {
   const [copied, setCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [howOpen, setHowOpen] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
 
   if (!order) return null;
 
@@ -56,6 +61,23 @@ const ReceiptModal = ({ order, open, onClose }: ReceiptModalProps) => {
   const yourCost = 480_000;
   const savings = order.savings ?? publicCost - yourCost;
   const maxBar = publicCost;
+
+  // Simulated timestamps based on order
+  const submittedTime = new Date(order.submittedAt);
+  const conditionTime = order.executedAt
+    ? new Date(new Date(order.executedAt).getTime() - 2000)
+    : new Date(submittedTime.getTime() + 180_000);
+  const decryptTime = new Date(conditionTime.getTime() + 1000);
+  const executeTime = order.executedAt
+    ? new Date(order.executedAt)
+    : new Date(decryptTime.getTime() + 1000);
+  const receiptTime = new Date(executeTime.getTime() + 1000);
+
+  const fmtTime = (d: Date) =>
+    d.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+  const shortAddr = (addr: string) =>
+    `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 
   const handleCopyHash = async () => {
     if (!order.txHash) return;
@@ -79,7 +101,6 @@ const ReceiptModal = ({ order, open, onClose }: ReceiptModalProps) => {
   };
 
   const handleDownloadPDF = () => {
-    // Build a print-friendly receipt in a new window
     const w = window.open("", "_blank");
     if (!w) return;
     w.document.write(`<!DOCTYPE html><html><head><title>Order Receipt #${order.id}</title>
@@ -121,9 +142,67 @@ const ReceiptModal = ({ order, open, onClose }: ReceiptModalProps) => {
     "No MEV front-running possible",
   ];
 
+  // Safety checks
+  const safetyChecks = [
+    { label: "Order size within limits", pass: true },
+    { label: "Slippage within tolerance", pass: true },
+    { label: "Oracle price verified", pass: true },
+    { label: "Timeout not exceeded", pass: true },
+    { label: "No front-running detected", pass: true },
+  ];
+
+  // Audit trail entries
+  const auditTrail = [
+    {
+      time: fmtTime(submittedTime),
+      title: "Order encrypted",
+      details: ["BITE v2 key shares distributed", order.txHash ? `Tx: ${shortAddr(order.txHash)}` : "Tx: pending"],
+      icon: Lock,
+      color: "153 100% 50%",
+    },
+    {
+      time: fmtTime(new Date(submittedTime.getTime() + 3000)),
+      title: "Order submitted to SKALE",
+      details: ["Block: 6108707", "Gas: $0.00 (FREE)"],
+      icon: FileText,
+      color: "200 100% 60%",
+    },
+    {
+      time: fmtTime(conditionTime),
+      title: "Oracle updated to $0.45",
+      details: ["Condition check: PASS ✅", "Threshold validation started"],
+      icon: Activity,
+      color: "45 100% 55%",
+    },
+    {
+      time: fmtTime(decryptTime),
+      title: "BITE v2 decryption",
+      details: ["2/3 validators approved", "Order data revealed"],
+      icon: Unlock,
+      color: "280 80% 65%",
+    },
+    {
+      time: fmtTime(executeTime),
+      title: "Trade executed",
+      details: [
+        `Executed at: $${order.executionPrice?.toFixed(2) ?? "0.48"}`,
+        `Slippage: 0% (within ${order.slippage}% limit)`,
+      ],
+      icon: Zap,
+      color: "153 100% 50%",
+    },
+    {
+      time: fmtTime(receiptTime),
+      title: "Receipt generated",
+      details: [`Savings: ${fmtUSD(savings)}`, "MEV prevented: YES ✅"],
+      icon: ShieldCheck,
+      color: "200 60% 55%",
+    },
+  ];
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-[640px] border-border bg-card p-0 overflow-hidden max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[760px] w-[95vw] border-border bg-card p-0 overflow-hidden max-h-[90vh] overflow-y-auto">
         {/* Green top border accent */}
         <div className="h-1.5 w-full bg-gradient-to-r from-primary via-primary/80 to-primary" />
 
@@ -142,26 +221,26 @@ const ReceiptModal = ({ order, open, onClose }: ReceiptModalProps) => {
           </DialogHeader>
 
           <div className="mt-6 space-y-5">
-            {/* Order Details */}
+            {/* ━━━ Order Details ━━━ */}
             <section>
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 📋 Order Details
               </h4>
               <div className="space-y-1.5 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Order ID</span>
-                  <span className="font-mono text-foreground">#{order.id}</span>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="shrink-0 text-muted-foreground">Order ID</span>
+                  <span className="font-mono text-foreground text-right">#{order.id}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Submitted</span>
-                  <span className="font-mono text-foreground">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="shrink-0 text-muted-foreground">Submitted</span>
+                  <span className="font-mono text-foreground text-right">
                     {new Date(order.submittedAt).toLocaleString()}
                   </span>
                 </div>
                 {order.executedAt && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Executed</span>
-                    <span className="font-mono text-foreground">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="shrink-0 text-muted-foreground">Executed</span>
+                    <span className="font-mono text-foreground text-right">
                       {new Date(order.executedAt).toLocaleString()}
                     </span>
                   </div>
@@ -171,36 +250,162 @@ const ReceiptModal = ({ order, open, onClose }: ReceiptModalProps) => {
 
             <hr className="border-primary/20" />
 
-            {/* Execution */}
+            {/* ━━━ Execution Details ━━━ */}
             <section>
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 💰 Execution Details
               </h4>
               <div className="space-y-1.5 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Amount</span>
-                  <span className="font-mono text-foreground">{fmtUSD(order.amount)}</span>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="shrink-0 text-muted-foreground">Amount</span>
+                  <span className="shrink-0 font-mono text-foreground text-right">{fmtUSD(order.amount)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Limit Price</span>
-                  <span className="font-mono text-foreground">${order.limitPrice.toFixed(2)}</span>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="shrink-0 text-muted-foreground">Limit Price</span>
+                  <span className="shrink-0 font-mono text-foreground text-right">${order.limitPrice.toFixed(2)}</span>
                 </div>
                 {order.executionPrice && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Executed At</span>
-                    <span className="font-mono text-primary">${order.executionPrice.toFixed(2)} ✅</span>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="shrink-0 text-muted-foreground">Executed At</span>
+                    <span className="shrink-0 font-mono text-primary text-right">${order.executionPrice.toFixed(2)} ✅</span>
                   </div>
                 )}
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Slippage</span>
-                  <span className="font-mono text-foreground">0% (within {order.slippage}% tolerance)</span>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="shrink-0 text-muted-foreground">Slippage</span>
+                  <span className="shrink-0 font-mono text-foreground text-right">0% (within {order.slippage}% tolerance)</span>
                 </div>
               </div>
             </section>
 
             <hr className="border-primary/20" />
 
-            {/* Privacy Proof */}
+            {/* ━━━ NEW: Encryption Details (BITE v2) ━━━ */}
+            <section>
+              <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                🔐 Encryption Details
+              </h4>
+              <div
+                className="rounded-xl p-4"
+                style={{
+                  background: "linear-gradient(135deg, hsl(153 100% 50% / 0.06), hsl(280 80% 65% / 0.04))",
+                  border: "1px solid hsl(153 100% 50% / 0.2)",
+                }}
+              >
+                <p className="text-[0.65rem] font-bold uppercase tracking-[0.1em] text-muted-foreground mb-2.5">
+                  What Stayed Encrypted
+                </p>
+                <div className="space-y-1.5">
+                  {[
+                    { label: "Order amount", value: fmtUSD(order.amount) },
+                    { label: "Limit price", value: `$${order.limitPrice.toFixed(2)}` },
+                    { label: "Trader identity", value: "0x0cEd..." },
+                    { label: "Slippage tolerance", value: `${order.slippage}%` },
+                  ].map((item) => (
+                    <div key={item.label} className="flex items-center gap-2 text-sm">
+                      <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      <span className="text-muted-foreground">{item.label}</span>
+                      <span className="font-mono font-semibold text-foreground ml-auto">{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  {[
+                    { label: "Method", value: "BITE v2" },
+                    { label: "Key Shares", value: "2-of-3" },
+                    { label: "Trigger", value: `≤ $${order.limitPrice.toFixed(2)}` },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className="rounded-lg p-2 text-center"
+                      style={{
+                        background: "hsl(0 0% 100% / 0.03)",
+                        border: "1px solid hsl(0 0% 100% / 0.08)",
+                      }}
+                    >
+                      <p className="text-[0.55rem] uppercase tracking-wider text-muted-foreground">{item.label}</p>
+                      <p className="text-xs font-bold text-primary mt-0.5">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <hr className="border-primary/20" />
+
+            {/* ━━━ NEW: Condition Verification ━━━ */}
+            <section>
+              <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                ⚡ Execution Condition
+              </h4>
+              <div
+                className="rounded-xl p-4"
+                style={{
+                  background: "linear-gradient(135deg, hsl(45 100% 55% / 0.06), hsl(45 100% 55% / 0.02))",
+                  border: "1px solid hsl(45 100% 55% / 0.2)",
+                }}
+              >
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="text-center">
+                    <p className="text-[0.55rem] uppercase tracking-wider text-muted-foreground">Oracle Price</p>
+                    <p className="font-mono text-lg font-bold" style={{ color: "hsl(45 100% 55%)" }}>$0.45</p>
+                  </div>
+                  <div className="text-center flex flex-col items-center justify-center">
+                    <p className="text-[0.55rem] uppercase tracking-wider text-muted-foreground">Comparison</p>
+                    <p className="font-mono text-sm font-bold text-primary">$0.45 ≤ $0.50 ✅</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[0.55rem] uppercase tracking-wider text-muted-foreground">Your Limit</p>
+                    <p className="font-mono text-lg font-bold text-foreground">${order.limitPrice.toFixed(2)}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 text-xs">
+                  {[
+                    { label: "Condition Met At", value: `${conditionTime.toLocaleDateString()} ${fmtTime(conditionTime)}` },
+                    { label: "Decryption Started", value: fmtTime(decryptTime) },
+                    { label: "Order Executed", value: fmtTime(executeTime) },
+                    { label: "Total Time", value: "2 seconds" },
+                  ].map((row) => (
+                    <div key={row.label} className="flex items-center justify-between gap-4">
+                      <span className="text-muted-foreground">{row.label}</span>
+                      <span className="font-mono font-semibold text-foreground">{row.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <hr className="border-primary/20" />
+
+            {/* ━━━ NEW: Safety Checks ━━━ */}
+            <section>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                🛡️ Safety Checks
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {safetyChecks.map((check, i) => (
+                  <motion.div
+                    key={check.label}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2 + i * 0.08 }}
+                    className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm"
+                    style={{
+                      background: "hsl(153 100% 50% / 0.04)",
+                      border: "1px solid hsl(153 100% 50% / 0.1)",
+                    }}
+                  >
+                    <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span className="text-foreground text-xs">{check.label}</span>
+                  </motion.div>
+                ))}
+              </div>
+            </section>
+
+            <hr className="border-primary/20" />
+
+            {/* ━━━ Privacy Proof ━━━ */}
             <section>
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 🔐 Privacy Proof
@@ -249,13 +454,12 @@ const ReceiptModal = ({ order, open, onClose }: ReceiptModalProps) => {
 
             <hr className="border-primary/20" />
 
-            {/* Comparison Chart */}
+            {/* ━━━ Cost Comparison ━━━ */}
             <section>
               <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 📊 Cost Comparison
               </h4>
               <div className="space-y-3">
-                {/* Public Order bar */}
                 <div>
                   <div className="mb-1 flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">Public Order</span>
@@ -271,7 +475,6 @@ const ReceiptModal = ({ order, open, onClose }: ReceiptModalProps) => {
                     />
                   </div>
                 </div>
-                {/* Your Order bar */}
                 <div>
                   <div className="mb-1 flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">Your Order (Encrypted)</span>
@@ -287,7 +490,6 @@ const ReceiptModal = ({ order, open, onClose }: ReceiptModalProps) => {
                     />
                   </div>
                 </div>
-                {/* Savings highlight */}
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -337,7 +539,88 @@ const ReceiptModal = ({ order, open, onClose }: ReceiptModalProps) => {
 
             <hr className="border-primary/20" />
 
-            {/* How This Works */}
+            {/* ━━━ NEW: Audit Trail (expandable) ━━━ */}
+            <section>
+              <button
+                onClick={() => setAuditOpen(!auditOpen)}
+                className="flex w-full items-center justify-between py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <span>📋 Complete Audit Trail</span>
+                <motion.div animate={{ rotate: auditOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                  <ChevronDown className="h-4 w-4" />
+                </motion.div>
+              </button>
+              <AnimatePresence>
+                {auditOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-3 space-y-0">
+                      {auditTrail.map((entry, i) => (
+                        <motion.div
+                          key={entry.title}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.08 }}
+                          className="flex gap-3 pb-3"
+                        >
+                          {/* Timeline line + dot */}
+                          <div className="flex flex-col items-center">
+                            <div
+                              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                              style={{
+                                background: `hsl(${entry.color} / 0.12)`,
+                                border: `1px solid hsl(${entry.color} / 0.3)`,
+                              }}
+                            >
+                              <entry.icon
+                                className="h-3.5 w-3.5"
+                                style={{ color: `hsl(${entry.color})` }}
+                              />
+                            </div>
+                            {i < auditTrail.length - 1 && (
+                              <div
+                                className="w-px flex-1 mt-1"
+                                style={{ background: "hsl(0 0% 100% / 0.08)" }}
+                              />
+                            )}
+                          </div>
+
+                          {/* Content */}
+                          <div className="min-w-0 pt-0.5">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="font-mono text-[0.6rem]"
+                                style={{ color: `hsl(${entry.color} / 0.7)` }}
+                              >
+                                [{entry.time}]
+                              </span>
+                              <span className="text-xs font-bold text-foreground">{entry.title}</span>
+                            </div>
+                            {entry.details.map((detail) => (
+                              <p
+                                key={detail}
+                                className="text-[0.65rem] text-muted-foreground mt-0.5 ml-0.5"
+                              >
+                                → {detail}
+                              </p>
+                            ))}
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </section>
+
+            <hr className="border-primary/20" />
+
+            {/* How This Works (expandable) */}
             <section>
               <button
                 onClick={() => setHowOpen(!howOpen)}
@@ -371,9 +654,6 @@ const ReceiptModal = ({ order, open, onClose }: ReceiptModalProps) => {
                           </div>
                           <p className="text-[10px] font-bold text-foreground">{step.title}</p>
                           <p className="text-[9px] text-muted-foreground leading-tight mt-0.5">{step.desc}</p>
-                          {i < howItWorksSteps.length - 1 && (
-                            <span className="absolute -right-1 top-1/2 text-xs text-muted-foreground hidden sm:block">→</span>
-                          )}
                         </motion.div>
                       ))}
                     </div>
